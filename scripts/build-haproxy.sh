@@ -31,9 +31,7 @@ container_runtime() {
 }
 
 clean_build_dirs() {
-  if ! rm -rf "${BUILD_DIR}" 2>/dev/null; then
-    sudo rm -rf "${BUILD_DIR}"
-  fi
+  rm -rf "${BUILD_DIR}"
   mkdir -p "${ROOTFS_DIR}"
 }
 
@@ -60,6 +58,10 @@ build_inside_container() {
 
   log "Building HAProxy ${HAPROXY_VERSION} using ${runtime} with base ${ROCKY_BASE_IMAGE}"
 
+  local host_uid host_gid
+  host_uid="$(id -u)"
+  host_gid="$(id -g)"
+
   local build_script
   build_script=$(cat <<'EOF'
 #!/usr/bin/env bash
@@ -75,6 +77,7 @@ dnf -y install \
   openssl-devel pcre2-devel lua-devel systemd-devel \
   readline-devel zlib-devel \
   tar gzip curl-minimal shadow-utils pkgconf-pkg-config \
+  diffutils \
   libatomic >/dev/null
 
 curl -fsSL "https://www.haproxy.org/download/${HAPROXY_VERSION%.*}/src/haproxy-${HAPROXY_VERSION}.tar.gz" -o /tmp/haproxy.tar.gz
@@ -102,6 +105,10 @@ install -m0755 admin/iprange/ip6range /work/rootfs/usr/bin/ip6range
 
 cp -a examples/errorfiles /work/rootfs/usr/share/haproxy/errorfiles
 
+if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
+  chown -R "${HOST_UID}:${HOST_GID}" /work/rootfs
+fi
+
 rm -f /tmp/haproxy.tar.gz
 EOF
 )
@@ -118,6 +125,8 @@ EOF
   ${runtime} run --rm \
     -v "${ROOTFS_DIR}:/work/rootfs:${mount_opts}" \
     -v "${tmpdir}/build.sh:/work/build.sh:ro" \
+    -e HOST_UID="${host_uid}" \
+    -e HOST_GID="${host_gid}" \
     "${ROCKY_BASE_IMAGE}" \
     bash /work/build.sh "${HAPROXY_VERSION}"
 
