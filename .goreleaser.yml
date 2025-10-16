@@ -5,7 +5,9 @@ before:
   hooks:
     - ./scripts/build-haproxy.sh
 
-builds: []
+builds:
+  - id: noop
+    skip: true
 
 release:
   header: |
