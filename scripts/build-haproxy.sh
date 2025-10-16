@@ -67,11 +67,12 @@ HAPROXY_VERSION="$1"
 
 dnf -y install dnf-plugins-core >/dev/null
 dnf config-manager --set-enabled crb >/dev/null
+dnf -y upgrade --refresh >/dev/null
 dnf -y install \
   gcc make \
   openssl-devel pcre2-devel lua-devel systemd-devel \
   readline-devel zlib-devel \
-  tar gzip curl shadow-utils pkgconf-pkg-config \
+  tar gzip curl-minimal shadow-utils pkgconf-pkg-config \
   libatomic >/dev/null
 
 curl -fsSL "https://www.haproxy.org/download/${HAPROXY_VERSION%.*}/src/haproxy-${HAPROXY_VERSION}.tar.gz" -o /tmp/haproxy.tar.gz
