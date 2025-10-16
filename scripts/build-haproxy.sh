@@ -31,7 +31,9 @@ container_runtime() {
 }
 
 clean_build_dirs() {
-  rm -rf "${BUILD_DIR}"
+  if ! rm -rf "${BUILD_DIR}" 2>/dev/null; then
+    sudo rm -rf "${BUILD_DIR}"
+  fi
   mkdir -p "${ROOTFS_DIR}"
 }
 
@@ -91,6 +93,7 @@ make install-bin DESTDIR=/work/rootfs PREFIX=/usr TARGET=linux2628
 make install-man DESTDIR=/work/rootfs PREFIX=/usr
 
 install -d -m0755 /work/rootfs/var/lib/haproxy
+install -d -m0755 /work/rootfs/usr/bin
 install -d -m0755 /work/rootfs/usr/share/haproxy
 
 install -m0755 admin/halog/halog /work/rootfs/usr/bin/halog
