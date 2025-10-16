@@ -1,0 +1,3 @@
+u haproxy - "HAProxy user" /var/lib/haproxy
+g haproxy - -
+m haproxy haproxy

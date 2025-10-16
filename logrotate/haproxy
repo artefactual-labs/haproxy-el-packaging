@@ -1,0 +1,12 @@
+/var/log/haproxy/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload haproxy.service >/dev/null 2>&1 || true
+    endscript
+}

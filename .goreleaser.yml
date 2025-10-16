@@ -1,0 +1,49 @@
+version: 2
+project_name: haproxy-el-packaging
+
+before:
+  hooks:
+    - ./scripts/build-haproxy.sh
+
+builds: []
+
+release:
+  header: |
+    ## Upstream component
+    - [HAProxy {{ .Env.HAPROXY_VERSION }}](https://www.haproxy.org/download/{{ index (split .Env.HAPROXY_VERSION ".") 0 }}.{{ index (split .Env.HAPROXY_VERSION ".") 1 }}/src/haproxy-{{ .Env.HAPROXY_VERSION }}.tar.gz)
+
+nfpms:
+  - id: haproxy-rpm
+    package_name: haproxy
+    maintainer: Artefactual Systems Inc. <sysadmin@artefactual.com>
+    vendor: Artefactual Systems Inc.
+    homepage: https://www.haproxy.org/
+    description: HAProxy 2.8 RPMs for Enterprise Linux with JA3 and Prometheus support
+    license: AGPL-3.0-or-later
+    formats: [rpm]
+    bindir: /usr/sbin
+    file_name_template: 'haproxy-{{ .Env.HAPROXY_VERSION }}-{{ .Env.PACKAGE_RELEASE }}.{{ .Arch }}'
+    release: '{{ .Env.PACKAGE_RELEASE }}'
+    epoch: 1
+    dependencies:
+      - systemd
+      - shadow-utils
+    contents:
+      - src: build/rootfs/usr
+        dst: /usr
+        type: tree
+      - src: build/rootfs/etc
+        dst: /etc
+        type: tree
+      - src: build/rootfs/var
+        dst: /var
+        type: tree
+    scripts:
+      postinstall: packaging/scripts/postinstall.sh
+      preremove: packaging/scripts/preremove.sh
+      postremove: packaging/scripts/postremove.sh
+    overrides:
+      rpm:
+        replacements:
+          amd64: x86_64
+          arm64: aarch64
