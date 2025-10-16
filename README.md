@@ -43,3 +43,11 @@ Artifacts will be written to `dist/`, including the RPM file (e.g., `haproxy-2.8
 4. Tag the repository (e.g., `v2.8.16-el9.1`) and trigger the release workflow.
 
 > **Tip:** Build EL8 packages by exporting `ROCKY_BASE_IMAGE=rockylinux:8` (or `almalinux:8`) before running GoReleaser. The same tag can be reused with matrix jobs if you want to publish both EL8 and EL9 artifacts from one run.
+
+## Release workflow
+
+Trigger the **Release** workflow manually from GitHub Actions once the repository is in the desired state:
+
+- Provide a canonical semantic version with a leading `v` (for example, `v2.8.16-el9.1`).
+- Optionally set `package_release` (defaults to `1` and passed through to GoReleaser).
+- The workflow builds the artifacts, tags the commit, and publishes a release whose notes include the upstream HAProxy version from `versions.env`.
