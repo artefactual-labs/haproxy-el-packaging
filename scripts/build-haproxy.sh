@@ -30,7 +30,7 @@ container_runtime() {
 }
 
 clean_build_dirs() {
-  rm -rf "${BUILD_DIR}"
+  safe_rm_rf "${BUILD_DIR}"
   mkdir -p "${BUILD_DIR}"
 }
 
@@ -145,6 +145,20 @@ EOF
   rm -rf "${tmpdir}"
 }
 
+safe_rm_rf() {
+  local target=$1
+  [ -z "${target}" ] && return 0
+  if rm -rf "${target}" 2>/dev/null; then
+    return 0
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo rm -rf "${target}"
+    return 0
+  fi
+  chmod -R u+w "${target}" 2>/dev/null || true
+  rm -rf "${target}"
+}
+
 main() {
   clean_build_dirs
 
@@ -174,7 +188,7 @@ main() {
     fi
 
     local rootfs_dir="${BUILD_DIR}/rootfs-${variant}"
-    rm -rf "${rootfs_dir}"
+    safe_rm_rf "${rootfs_dir}"
     mkdir -p "${rootfs_dir}"
     prepare_host_assets "${rootfs_dir}"
     build_inside_container "${runtime}" "${image}" "${rootfs_dir}" "${variant}"
