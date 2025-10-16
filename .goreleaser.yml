@@ -42,8 +42,3 @@ nfpms:
       postinstall: packaging/scripts/postinstall.sh
       preremove: packaging/scripts/preremove.sh
       postremove: packaging/scripts/postremove.sh
-    overrides:
-      rpm:
-        replacements:
-          amd64: x86_64
-          arm64: aarch64
