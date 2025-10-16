@@ -16,6 +16,7 @@ release:
 
 nfpms:
   - id: haproxy-rpm
+    builds: []
     package_name: haproxy
     maintainer: Artefactual Systems Inc. <sysadmin@artefactual.com>
     vendor: Artefactual Systems Inc.
