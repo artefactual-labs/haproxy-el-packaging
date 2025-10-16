@@ -6,8 +6,12 @@ before:
     - ./scripts/build-haproxy.sh
 
 builds:
-  - id: noop
-    skip: true
+  - id: helper
+    main: ./cmd/placeholder
+    binary: haproxy-packaging-helper
+    goos: [linux]
+    goarch: [amd64]
+    skip: false
 
 release:
   header: |
@@ -15,8 +19,9 @@ release:
     - [HAProxy {{ .Env.HAPROXY_VERSION }}](https://www.haproxy.org/download/{{ index (split .Env.HAPROXY_VERSION ".") 0 }}.{{ index (split .Env.HAPROXY_VERSION ".") 1 }}/src/haproxy-{{ .Env.HAPROXY_VERSION }}.tar.gz)
 
 nfpms:
-  - id: haproxy-rpm
-    builds: []
+  - id: haproxy-el9
+    ids: [helper]
+    meta: true
     package_name: haproxy
     maintainer: Artefactual Systems Inc. <sysadmin@artefactual.com>
     vendor: Artefactual Systems Inc.
@@ -25,20 +30,51 @@ nfpms:
     license: AGPL-3.0-or-later
     formats: [rpm]
     bindir: /usr/sbin
-    file_name_template: 'haproxy-{{ .Env.HAPROXY_VERSION }}-{{ .Env.PACKAGE_RELEASE }}.{{ .Arch }}'
+    file_name_template: 'haproxy-{{ .Env.HAPROXY_VERSION }}-{{ .Env.PACKAGE_RELEASE }}.el9.{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}'
     release: '{{ .Env.PACKAGE_RELEASE }}'
     epoch: 1
     dependencies:
       - systemd
       - shadow-utils
     contents:
-      - src: build/rootfs/usr
+      - src: build/rootfs-el9/usr
         dst: /usr
         type: tree
-      - src: build/rootfs/etc
+      - src: build/rootfs-el9/etc
         dst: /etc
         type: tree
-      - src: build/rootfs/var
+      - src: build/rootfs-el9/var
+        dst: /var
+        type: tree
+    scripts:
+      postinstall: packaging/scripts/postinstall.sh
+      preremove: packaging/scripts/preremove.sh
+      postremove: packaging/scripts/postremove.sh
+  - id: haproxy-el8
+    ids: [helper]
+    meta: true
+    package_name: haproxy
+    maintainer: Artefactual Systems Inc. <sysadmin@artefactual.com>
+    vendor: Artefactual Systems Inc.
+    homepage: https://www.haproxy.org/
+    description: HAProxy 2.8 RPMs for Enterprise Linux with JA3 and Prometheus support
+    license: AGPL-3.0-or-later
+    formats: [rpm]
+    bindir: /usr/sbin
+    file_name_template: 'haproxy-{{ .Env.HAPROXY_VERSION }}-{{ .Env.PACKAGE_RELEASE }}.el8.{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}'
+    release: '{{ .Env.PACKAGE_RELEASE }}'
+    epoch: 1
+    dependencies:
+      - systemd
+      - shadow-utils
+    contents:
+      - src: build/rootfs-el8/usr
+        dst: /usr
+        type: tree
+      - src: build/rootfs-el8/etc
+        dst: /etc
+        type: tree
+      - src: build/rootfs-el8/var
         dst: /var
         type: tree
     scripts:

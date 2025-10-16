@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, e.g.: v2.8.16-el9.1"
+        description: "Version to release, e.g.: 2.8.16-1"
         required: true
         type: string
       package_release:
@@ -45,6 +45,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PACKAGE_RELEASE: ${{ github.event.inputs.package_release }}
+      HAPROXY_BUILD_TARGETS: "el9=rockylinux:9 el8=rockylinux:8"
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0

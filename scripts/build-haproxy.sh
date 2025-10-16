@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build"
-ROOTFS_DIR="${BUILD_DIR}/rootfs"
 
 if [ -f "${ROOT_DIR}/versions.env" ]; then
   # shellcheck disable=SC1091
@@ -12,7 +11,7 @@ fi
 
 : "${HAPROXY_VERSION:?Set HAPROXY_VERSION (e.g. 2.8.16)}"
 : "${PACKAGE_RELEASE:=1}"
-: "${ROCKY_BASE_IMAGE:=rockylinux:9}"
+: "${HAPROXY_BUILD_TARGETS:=el9=rockylinux:9 el8=rockylinux:8}"
 
 log() {
   printf '[build-haproxy] %s\n' "$*" >&2
@@ -32,31 +31,32 @@ container_runtime() {
 
 clean_build_dirs() {
   rm -rf "${BUILD_DIR}"
-  mkdir -p "${ROOTFS_DIR}"
+  mkdir -p "${BUILD_DIR}"
 }
 
 prepare_host_assets() {
-  install -d -m0755 "${ROOTFS_DIR}/etc/haproxy"
-  install -d -m0755 "${ROOTFS_DIR}/etc/logrotate.d"
-  install -d -m0755 "${ROOTFS_DIR}/etc/sysconfig"
-  install -d -m0755 "${ROOTFS_DIR}/usr/lib/systemd/system"
-  install -d -m0755 "${ROOTFS_DIR}/usr/lib/sysusers.d"
+  local rootfs_dir=$1
 
-  install -D -m0644 "${ROOT_DIR}/config/haproxy.cfg" "${ROOTFS_DIR}/etc/haproxy/haproxy.cfg"
-  install -D -m0644 "${ROOT_DIR}/logrotate/haproxy" "${ROOTFS_DIR}/etc/logrotate.d/haproxy"
-  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.service" "${ROOTFS_DIR}/usr/lib/systemd/system/haproxy.service"
-  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.sysconfig" "${ROOTFS_DIR}/etc/sysconfig/haproxy"
-  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.sysusers" "${ROOTFS_DIR}/usr/lib/sysusers.d/haproxy.conf"
+  install -d -m0755 "${rootfs_dir}/etc/haproxy"
+  install -d -m0755 "${rootfs_dir}/etc/logrotate.d"
+  install -d -m0755 "${rootfs_dir}/etc/sysconfig"
+  install -d -m0755 "${rootfs_dir}/usr/lib/systemd/system"
+  install -d -m0755 "${rootfs_dir}/usr/lib/sysusers.d"
+
+  install -D -m0644 "${ROOT_DIR}/config/haproxy.cfg" "${rootfs_dir}/etc/haproxy/haproxy.cfg"
+  install -D -m0644 "${ROOT_DIR}/logrotate/haproxy" "${rootfs_dir}/etc/logrotate.d/haproxy"
+  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.service" "${rootfs_dir}/usr/lib/systemd/system/haproxy.service"
+  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.sysconfig" "${rootfs_dir}/etc/sysconfig/haproxy"
+  install -D -m0644 "${ROOT_DIR}/systemd/haproxy.sysusers" "${rootfs_dir}/usr/lib/sysusers.d/haproxy.conf"
 }
 
 build_inside_container() {
-  local runtime
-  runtime="$(container_runtime)" || {
-    log "Neither podman nor docker is available; cannot build HAProxy natively."
-    exit 1
-  }
+  local runtime=$1
+  local image=$2
+  local rootfs_dir=$3
+  local variant=$4
 
-  log "Building HAProxy ${HAPROXY_VERSION} using ${runtime} with base ${ROCKY_BASE_IMAGE}"
+  log "Building HAProxy ${HAPROXY_VERSION} for ${variant} using ${runtime} with base ${image}"
 
   local host_uid host_gid
   host_uid="$(id -u)"
@@ -68,17 +68,28 @@ build_inside_container() {
 set -euo pipefail
 
 HAPROXY_VERSION="$1"
+BUILD_VARIANT="${BUILD_VARIANT:-}"
 
 dnf -y install dnf-plugins-core >/dev/null
-dnf config-manager --set-enabled crb >/dev/null
+if [ "${BUILD_VARIANT}" = "el9" ]; then
+  dnf config-manager --set-enabled crb >/dev/null
+elif [ "${BUILD_VARIANT}" = "el8" ]; then
+  dnf config-manager --set-enabled powertools >/dev/null
+else
+  dnf config-manager --set-enabled crb >/dev/null 2>&1 || true
+  dnf config-manager --set-enabled powertools >/dev/null 2>&1 || true
+fi
 dnf -y upgrade --refresh >/dev/null
 dnf -y install \
   gcc make \
   openssl-devel pcre2-devel lua-devel systemd-devel \
   readline-devel zlib-devel \
-  tar gzip curl-minimal shadow-utils pkgconf-pkg-config \
+  tar gzip shadow-utils pkgconf-pkg-config \
   diffutils \
   libatomic >/dev/null
+if ! dnf -y install curl-minimal >/dev/null; then
+  dnf -y install curl >/dev/null
+fi
 
 curl -fsSL "https://www.haproxy.org/download/${HAPROXY_VERSION%.*}/src/haproxy-${HAPROXY_VERSION}.tar.gz" -o /tmp/haproxy.tar.gz
 tar -xf /tmp/haproxy.tar.gz -C /tmp
@@ -123,11 +134,12 @@ EOF
   fi
 
   ${runtime} run --rm \
-    -v "${ROOTFS_DIR}:/work/rootfs:${mount_opts}" \
+    -v "${rootfs_dir}:/work/rootfs:${mount_opts}" \
     -v "${tmpdir}/build.sh:/work/build.sh:ro" \
     -e HOST_UID="${host_uid}" \
     -e HOST_GID="${host_gid}" \
-    "${ROCKY_BASE_IMAGE}" \
+    -e BUILD_VARIANT="${variant}" \
+    "${image}" \
     bash /work/build.sh "${HAPROXY_VERSION}"
 
   rm -rf "${tmpdir}"
@@ -135,9 +147,39 @@ EOF
 
 main() {
   clean_build_dirs
-  prepare_host_assets
-  build_inside_container
-  log "HAProxy rootfs ready under ${ROOTFS_DIR}"
+
+  local runtime
+  runtime="$(container_runtime)" || {
+    log "Neither podman nor docker is available; cannot build HAProxy natively."
+    exit 1
+  }
+
+  IFS=' ' read -r -a targets <<< "${HAPROXY_BUILD_TARGETS}"
+  if [ "${#targets[@]}" -eq 0 ]; then
+    log "No build targets defined via HAPROXY_BUILD_TARGETS."
+    exit 1
+  fi
+
+  for entry in "${targets[@]}"; do
+    [ -z "${entry}" ] && continue
+    if [[ "${entry}" != *=* ]]; then
+      log "Invalid entry '${entry}' in HAPROXY_BUILD_TARGETS (expected variant=image)."
+      exit 1
+    fi
+    local variant="${entry%%=*}"
+    local image="${entry#*=}"
+    if [ -z "${variant}" ] || [ -z "${image}" ]; then
+      log "Invalid entry '${entry}' in HAPROXY_BUILD_TARGETS (empty variant or image)."
+      exit 1
+    fi
+
+    local rootfs_dir="${BUILD_DIR}/rootfs-${variant}"
+    rm -rf "${rootfs_dir}"
+    mkdir -p "${rootfs_dir}"
+    prepare_host_assets "${rootfs_dir}"
+    build_inside_container "${runtime}" "${image}" "${rootfs_dir}" "${variant}"
+    log "HAProxy rootfs ready under ${rootfs_dir}"
+  done
 }
 
 main "$@"

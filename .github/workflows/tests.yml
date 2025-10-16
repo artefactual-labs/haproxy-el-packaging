@@ -14,7 +14,9 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Show Docker version
         run: docker --version
-      - name: Prepare HAProxy root filesystem
+      - name: Prepare HAProxy root filesystems
         run: ./scripts/build-haproxy.sh
+        env:
+          HAPROXY_BUILD_TARGETS: "el9=rockylinux:9 el8=rockylinux:8"
       - name: Display generated tree
-        run: find build/rootfs -maxdepth 3 -type d -print
+        run: find build -maxdepth 3 -type d -name 'rootfs-*' -print
