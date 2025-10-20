@@ -1,20 +1,18 @@
 [Unit]
 Description=HAProxy Load Balancer
-Documentation=man:haproxy(1)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 EnvironmentFile=-/etc/sysconfig/haproxy
-ExecStart=/usr/sbin/haproxy -Ws -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid
-ExecReload=/usr/sbin/haproxy -Ws -f /etc/haproxy/haproxy.cfg -c -q
-ExecReload=/usr/bin/systemctl kill --kill-who=main --signal=USR2 haproxy.service
-Type=notify
+Environment="CONFIG=/etc/haproxy/haproxy.cfg" "PIDFILE=/run/haproxy.pid" "CFGDIR=/etc/haproxy/conf.d"
+ExecStartPre=/usr/sbin/haproxy -f $CONFIG -f $CFGDIR -c -q $OPTIONS
+ExecStart=/usr/sbin/haproxy -Ws -f $CONFIG -f $CFGDIR -p $PIDFILE $OPTIONS
+ExecReload=/usr/sbin/haproxy -f $CONFIG -f $CFGDIR -c -q $OPTIONS
+ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
-Restart=always
-RestartSec=3s
-User=haproxy
-Group=haproxy
+SuccessExitStatus=143
+Type=notify
 
 [Install]
 WantedBy=multi-user.target
