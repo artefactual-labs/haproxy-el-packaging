@@ -1,4 +1,5 @@
 dist/
 build/
+/.goreleaser.rendered.yml
 .gocache/
 .DS_Store
