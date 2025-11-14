@@ -85,16 +85,16 @@ jobs:
       - name: Render GoReleaser config
         run: |
           python - <<'PY'
-import os
-from pathlib import Path
-
-content = Path(".goreleaser.yml").read_text()
-needle = "release: '{{ .Env.PACKAGE_RELEASE }}'"
-replacement = f"release: '{os.environ['PACKAGE_RELEASE']}'"
-if needle not in content:
-    raise SystemExit(f"Could not find template token '{needle}' in .goreleaser.yml")
-Path(".goreleaser.rendered.yml").write_text(content.replace(needle, replacement))
-PY
+          import os
+          from pathlib import Path
+	
+          content = Path(".goreleaser.yml").read_text()
+          needle = "release: '{{ .Env.PACKAGE_RELEASE }}'"
+          replacement = f"release: '{os.environ['PACKAGE_RELEASE']}'"
+          if needle not in content:
+              raise SystemExit(f"Could not find template token '{needle}' in .goreleaser.yml")
+          Path(".goreleaser.rendered.yml").write_text(content.replace(needle, replacement))
+          PY
       - name: Build artifacts only
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
