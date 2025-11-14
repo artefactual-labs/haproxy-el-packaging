@@ -87,7 +87,7 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-	
+
           content = Path(".goreleaser.yml").read_text()
           needle = "release: '{{ .Env.PACKAGE_RELEASE }}'"
           replacement = f"release: '{os.environ['PACKAGE_RELEASE']}'"
